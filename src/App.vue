@@ -19,6 +19,11 @@
         开始时间 {{ this.timestampToString(this.playerOptions.start) }}
       </h3>
     </div>
+    <div>
+      当前状态：{{ this.statusText }}
+      <br>
+      自动播放：{{ this.autoStartEnabled ? '开启' : '关闭' }}
+    </div>
 
   </div>
 </template>
@@ -38,8 +43,18 @@ export default {
       playerOptions: {
         controls: [
           {
+            name: 'autoStartCtl',
+            tag: 'auto-start',
             position: 'right',
-            html: '同步',
+            html: '自动同步开关',
+            // handler will be assigned after component mounted
+            click: function() {},
+          },
+          {
+            name: 'syncCtl',
+            tag: 'sync',
+            position: 'right',
+            html: '同步进度',
             // handler will be assigned after component mounted
             click: function() {},
           }
@@ -76,6 +91,13 @@ export default {
       configLoaded: false,
 
       playerInstance: null,
+      playerCallbacks: {
+        'auto-start': this.onToggleAutoStart,
+        'sync': this.onSyncProgress,
+      },
+      autoStartEnabled: true,
+      autoStartTimeoutCode: 0,
+      statusText: '正在获取...',
     }
   },
   methods: {
@@ -96,6 +118,23 @@ export default {
       timeString += ' ' + (hour < 10 ? '0' + hour : hour) + ':' + (min < 10 ? '0' + min : min);
       return timeString;
     },
+    refreshStatusText() {
+      const now = Math.round(new Date().getTime() / 1000.);
+      const art = this.playerInstance;
+      if (!art) {
+        setTimeout(this.refreshStatusText, 1000);
+        return;
+      }
+      const start_ts = this.playerOptions.start;
+      const end_ts = start_ts + art.player.duration;
+      if (now < start_ts) {
+        this.statusText = '尚未开始';
+      } else if (now < end_ts) {
+        this.statusText = '正在播放';
+      } else {
+        this.statusText = '已结束';
+      }
+    },
     onSyncProgress() {
       const start = this.playerOptions.start;
       if (!this.playerInstance || !start) return;
@@ -108,6 +147,43 @@ export default {
         'jump to', jump_to,
       );
       art.currentTime = jump_to;
+    },
+    onToggleAutoStart() {
+      console.log('onToggleAutoStart. current ', this.autoStartEnabled);
+      if (this.autoStartEnabled) {
+        this.autoStartEnabled = false;
+        this.$message.info('自动播放：已关闭');
+        clearTimeout(this.autoStartTimeoutCode);
+      } else {
+        this.autoStartEnabled = true;
+        this.$message.success('自动播放：已开启');
+        this.onAutoStartEnabled();
+      }
+      console.log(this.playerInstance);
+    },
+    onAutoStartEnabled() {
+      if (this.autoStartTimeoutCode) {
+        clearTimeout(this.autoStartTimeoutCode);
+      }
+      if (!this.playerInstance) {
+        this.autoStartTimeoutCode = setTimeout(this.onAutoStartEnabled, 1000);
+        console.log('[onAutoStartEnabled] player not loaded, retry after 1s');
+        return;
+      }
+      const now = Math.round(new Date().getTime() / 1000.);
+      const art = this.playerInstance;
+      const start_ts = this.playerOptions.start;
+      const end_ts = start_ts + art.player.duration;
+      if (now < start_ts) {
+        art.player.play = false;
+        this.autoStartTimeoutCode = setTimeout(() => {
+          this.onSyncProgress();
+          art.player.play = true;
+        }, (start_ts - now) * 1000);
+      } else if (now < end_ts) {
+        this.onSyncProgress();
+        art.player.play = true;
+      }
     },
     async fetchConfigBg() {
       try {
@@ -134,6 +210,16 @@ export default {
       }
     },
     updatePlayerOption(config) {
+      let startTimeUpdated = false;
+      // let urlUpdated = false;
+      // let subsUpdated = false;
+      // let qualityUpdated = false;
+
+      if (this.playerOptions.start !== config.start) {
+        console.log('start time updated', this.playerOptions.start, '->', config.start);
+        startTimeUpdated = true;
+      }
+
       Object.assign(this.playerOptions, config);
       // post-processing
       const icons = this.playerOptions.icons;
@@ -144,14 +230,14 @@ export default {
         }
       }
 
-      // add sync progress handler
-      this.playerOptions.controls.forEach(
-        (ctl) => {
-          ctl.click = this.onSyncProgress;
+      if (startTimeUpdated) {
+        if (this.onAutoStartEnabled) {
+          this.onAutoStartEnabled();
         }
-      )
+      }
 
       this.configLoaded = true;
+      this.refreshStatusText();
       console.log(config);
 
     }
@@ -160,9 +246,21 @@ export default {
     const rtn = await api.getConfig();
     const config = rtn.data;
 
+    // add sync progress handler
+    this.playerOptions.controls.forEach(
+      (ctl) => {
+        const tag = ctl.tag;
+        if (Object.prototype.hasOwnProperty.call(this.playerCallbacks, tag)) {
+          const callback = this.playerCallbacks[tag];
+          ctl.click = callback;
+        }
+      }
+    )
+
     this.updatePlayerOption(config);
 
     this.fetchConfigBg();
+
   }
 }
 </script>
