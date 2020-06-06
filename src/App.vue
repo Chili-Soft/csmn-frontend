@@ -192,12 +192,21 @@ export default {
     },
     onURLUpdated(url) {
       if (!this.playerInstance) {
-        setTimeout(() => { this.onAutoStartEnabled(url) }, 1000);
+        setTimeout(() => { this.onURLUpdated(url) }, 1000);
         console.log('[onURLUpdated] player not loaded, retry after 1s');
         return;
       }
       this.playerInstance.player.url = url;
     },
+    onSubtitleUpdated(url) {
+      if (!this.playerInstance) {
+        setTimeout(() => { this.onSubtitleUpdated(url) }, 1000);
+        console.log('[onSubtitleUpdated] player not loaded, retry after 1s');
+        return;
+      }
+      this.playerInstance.subtitle.switch(url, url);
+    },
+
     async fetchConfigBg() {
       try {
         const rtn = await api.getConfig();
@@ -225,7 +234,7 @@ export default {
     updatePlayerOption(config) {
       let startTimeUpdated = false;
       let urlUpdated = false;
-      // let subsUpdated = false;
+      let subtitleUpdated = false;
       // let qualityUpdated = false;
 
       if (this.playerOptions.start !== config.start) {
@@ -236,6 +245,14 @@ export default {
       if (this.playerOptions.url !== config.url) {
         console.log('url updated', this.playerOptions.url, '->', config.url);
         urlUpdated = true;
+      }
+
+      if (config.subtitle) {
+        const newSub = config.subtitle.url;
+        if (this.playerOptions.subtitle && this.playerOptions.subtitle.url !== newSub) {
+          console.log('subtitle updated', this.playerOptions.subtitle.url, '->', newSub);
+          subtitleUpdated = true;
+        }
       }
 
       Object.assign(this.playerOptions, config);
@@ -259,6 +276,10 @@ export default {
           this.onURLUpdated(config.url);
           this.onAutoStartEnabled();
         }
+      }
+
+      if (subtitleUpdated) {
+        this.onSubtitleUpdated(config.subtitle.url);
       }
 
       this.configLoaded = true;
