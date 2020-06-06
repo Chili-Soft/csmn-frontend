@@ -22,7 +22,7 @@
     <div>
       当前状态：{{ this.statusText }}
       <br>
-      自动播放：{{ this.autoStartEnabled ? '开启' : '关闭' }}
+      自动同步：{{ this.autoStartEnabled ? '开启' : '关闭' }}
     </div>
 
   </div>
@@ -170,6 +170,11 @@ export default {
         console.log('[onAutoStartEnabled] player not loaded, retry after 1s');
         return;
       }
+
+      if (!this.onAutoStartEnabled) {
+        return;
+      }
+
       const now = Math.round(new Date().getTime() / 1000.);
       const art = this.playerInstance;
       const start_ts = this.playerOptions.start;
@@ -185,6 +190,14 @@ export default {
         art.player.play = true;
       }
     },
+    onURLUpdated(url) {
+      if (!this.playerInstance) {
+        setTimeout(() => { this.onAutoStartEnabled(url) }, 1000);
+        console.log('[onURLUpdated] player not loaded, retry after 1s');
+        return;
+      }
+      this.playerInstance.player.url = url;
+    },
     async fetchConfigBg() {
       try {
         const rtn = await api.getConfig();
@@ -198,7 +211,7 @@ export default {
           this.updatePlayerOption(config);
           this.$notify({
             title: '配置已更新',
-            message: '如果有播放链接/CDN/字幕更新，请手动刷新页面',
+            message: '如果播放内容没有正常更新，请确认自动同步已开启，或尝试手动刷新页面',
             type: 'success'
           });
         }
@@ -211,13 +224,18 @@ export default {
     },
     updatePlayerOption(config) {
       let startTimeUpdated = false;
-      // let urlUpdated = false;
+      let urlUpdated = false;
       // let subsUpdated = false;
       // let qualityUpdated = false;
 
       if (this.playerOptions.start !== config.start) {
         console.log('start time updated', this.playerOptions.start, '->', config.start);
         startTimeUpdated = true;
+      }
+
+      if (this.playerOptions.url !== config.url) {
+        console.log('url updated', this.playerOptions.url, '->', config.url);
+        urlUpdated = true;
       }
 
       Object.assign(this.playerOptions, config);
@@ -232,6 +250,13 @@ export default {
 
       if (startTimeUpdated) {
         if (this.onAutoStartEnabled) {
+          this.onAutoStartEnabled();
+        }
+      }
+
+      if (urlUpdated) {
+        if (this.onAutoStartEnabled) {
+          this.onURLUpdated(config.url);
           this.onAutoStartEnabled();
         }
       }
