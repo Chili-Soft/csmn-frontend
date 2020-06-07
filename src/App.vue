@@ -22,7 +22,7 @@
     <div>
       当前状态：{{ this.statusText }}
       <br>
-      自动同步：{{ this.autoStartEnabled ? '开启' : '关闭' }}
+      自动同步：{{ this.autoStartEnabled ? '已开启' : '已关闭' }}
     </div>
 
   </div>
@@ -127,6 +127,16 @@ export default {
       }
       const start_ts = this.playerOptions.start;
       const end_ts = start_ts + art.player.duration;
+      console.log(
+        '[refreshStatusText] now =', now,
+        'start =', start_ts, 'duration =', art.player.duration, 'end = ', end_ts
+      );
+      if (art.player.duration === Infinity) {
+        // fix: duration is Infinity before video loaded
+        console.log('[refreshStatusText] incorrect duration. refresh later.');
+        setTimeout(this.refreshStatusText, 500);
+        return;
+      }
       if (now < start_ts) {
         this.statusText = '尚未开始';
       } else if (now < end_ts) {
@@ -175,8 +185,16 @@ export default {
         return;
       }
 
-      const now = Math.round(new Date().getTime() / 1000.);
       const art = this.playerInstance;
+
+      if (art.player.duration ===  Infinity) {
+        // fix: duration is Infinity before video loaded
+        console.log('[onAutoStartEnabled] incorrect duration. retry later.');
+        this.autoStartTimeoutCode = setTimeout(this.onAutoStartEnabled, 500);
+        return;
+      }
+
+      const now = Math.round(new Date().getTime() / 1000.);
       const start_ts = this.playerOptions.start;
       const end_ts = start_ts + art.player.duration;
       if (now < start_ts) {
@@ -188,6 +206,8 @@ export default {
       } else if (now < end_ts) {
         this.onSyncProgress();
         art.player.play = true;
+      } else {
+        console.log('[onAutoStartEnabled] ended. no auto sync');
       }
     },
     onURLUpdated(url) {
@@ -282,8 +302,8 @@ export default {
         this.onSubtitleUpdated(config.subtitle.url);
       }
 
-      this.configLoaded = true;
       this.refreshStatusText();
+      this.configLoaded = true;
       console.log(config);
 
     }
