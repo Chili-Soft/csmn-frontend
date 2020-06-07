@@ -251,6 +251,7 @@ export default {
       } else {
         console.log('[onAutoStartEnabled] ended. no auto sync');
       }
+      this.refreshStatusText();
     },
     onURLUpdated(url) {
       if (!this.playerInstance) {
