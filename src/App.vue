@@ -2,28 +2,66 @@
   <div id="app">
     <!-- <h1>{{ CSMN_TITLE }}</h1> -->
     <!-- <el-divider></el-divider> -->
-    <div>
-      <h1> {{ this.playerOptions.title }} </h1>
-    </div>
-    <br>
-    <div id="player">
-      <ArtplayerComponent v-if="this.configLoaded"
-        :option="this.playerOptions"
-        @getInstance="this.getInstance"
-        :style="this.playerStyle"
-      />
-    </div>
-    <br>
-    <div>
-      <h3>
-        开始时间 {{ this.timestampToString(this.playerOptions.start) }}
-      </h3>
-    </div>
-    <div>
-      当前状态：{{ this.statusText }}
-      <br>
-      自动同步：{{ this.autoStartEnabled ? '已开启' : '已关闭' }}
-    </div>
+  <el-container style="height: 100%;">
+
+    <el-header
+      style="text-align: center; font-size: 12px; height: 80px; width: 90%; align-self: center"
+      ref="headerContainer"
+    >
+      <el-row>
+        <el-col :span="18" :offset="2">
+          <span
+            style="text-align: center; font-size: 32px; text-shadow: 0 0 0.3em rgb(250, 223, 181), 0 0 0.2em rgb(250, 223, 181)"
+          > {{ this.playerOptions.title }} </span>
+        </el-col>
+        <el-col :span="2">
+          <el-row style="height: 80px; margin: 0px; padding: 0px; line-height: 60px">
+            <el-row style="height: 20%; margin-bottom: 5px">
+              <span text>当前状态：{{ this.statusText }}</span>
+            </el-row>
+            <el-row style="height: 20%; margin-top: 5px">
+              <span text>自动同步：{{ this.autoStartEnabled ? '已开启' : '已关闭' }}</span>
+            </el-row>
+          </el-row>
+        </el-col>
+      </el-row>
+
+    </el-header>
+    
+    
+    <el-row align="center" type="flex" justify="space-around" ref="mainContainer">
+      <el-col :span="17" :offset="1" ref="playerContainer">
+          <ArtplayerComponent v-if="this.configLoaded" ref="player"
+            :option="this.playerOptions"
+            @getInstance="this.getInstance"
+            :style="this.playerStyle"
+          />
+      </el-col>
+
+      <el-col :span="4">
+          <widgetbot id="discord-widget"
+            :server="this.discordWidget.serverID"
+            :channel="this.discordWidget.channelID"
+            height="100%"
+            width="100%"
+            shard="https://e.widgetbot.io"
+          ></widgetbot>
+      </el-col>
+      <el-col :span="1"></el-col>
+    </el-row>
+
+    <el-row style="height: 15%" ref="infoContainer">
+      <el-col :span="24">
+        <div>
+          <h3>
+            开始时间 {{ this.timestampToString(this.playerOptions.start) }}
+          </h3>
+        </div>
+      </el-col>
+    </el-row>
+
+  </el-container>
+
 
   </div>
 </template>
@@ -35,11 +73,15 @@ import * as api from './api.js';
 export default {
   name: 'app',
   components: {
-    ArtplayerComponent
+    ArtplayerComponent,
   },
   data () {
     return {
       CSMN_TITLE: 'ChiliSoft - Movie Night',
+      discordWidget: {
+        serverID: '680269512188362809',
+        channelID: '680269512704393246',
+      },
       playerOptions: {
         controls: [
           {
@@ -83,10 +125,10 @@ export default {
         update_ts: 0,
         // END - will be replaced by server config
       },
+      // default player style, re-compute after mounted
       playerStyle: {
-        width: '1280px',
-        height: '720px',
-        margin: '0 auto',
+        width: 'auto',
+        height: 'auto',
       },
       configLoaded: false,
 
@@ -306,7 +348,20 @@ export default {
       this.configLoaded = true;
       console.log(config);
 
-    }
+    },
+    onResize() {
+      // update container height first
+      const windowHeight = window.innerHeight - 50;
+      const infoContainerHeight = this.$refs.infoContainer.$el.scrollHeight;
+      const headerContainerHeight = this.$refs.headerContainer.$el.scrollHeight;
+      this.$refs.mainContainer.$el.style.height = (windowHeight - infoContainerHeight - headerContainerHeight) + 'px';
+
+      const containerWidth = this.$refs.playerContainer.$el.clientWidth;
+      const containerHeight = this.$refs.playerContainer.$el.clientHeight;
+      this.playerStyle.width = containerWidth + 'px';
+      this.playerStyle.height = containerHeight + 'px';
+      console.log('window resize: new player size:', containerWidth, containerHeight);
+    },
   },
   async mounted() {
     const rtn = await api.getConfig();
@@ -323,18 +378,38 @@ export default {
       }
     )
 
+    // load discord widget
+    let discordWidgetScript = document.createElement('script');
+    discordWidgetScript.setAttribute('src', 'https://cdn.jsdelivr.net/npm/@widgetbot/html-embed');
+    document.head.appendChild(discordWidgetScript);
+
+    // initial height for player
+    const windowHeight = window.innerHeight;
+    this.playerStyle.height = Math.round(windowHeight * 0.8) + 'px';
+    this.$nextTick(() => {
+      window.addEventListener('resize', this.onResize);
+    })
+    
     this.updatePlayerOption(config);
 
     this.fetchConfigBg();
 
-  }
+  },
+
+  beforeDestroy() { 
+    window.removeEventListener('resize', this.onResize); 
+  },
+
+  
+
+
 }
 </script>
 
 <style>
 
 body {
-  background-color: #0a0a0a;
+  background-color: #1e1e1e;
 }
 
 #app {
@@ -343,7 +418,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: rgb(250, 223, 181);
-  margin-top: 60px;
 }
 
 h1, h2 {
@@ -367,5 +441,12 @@ li {
 
 a {
   color: #42b983;
+}
+
+.el-header {
+  background-color: #252526;
+  color: #e6c271;
+  line-height: 80px;
+  margin-bottom: 20px;
 }
 </style>
