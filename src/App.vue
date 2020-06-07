@@ -244,6 +244,7 @@ export default {
         this.autoStartTimeoutCode = setTimeout(() => {
           this.onSyncProgress();
           art.player.play = true;
+          this.refreshStatusText();
         }, (start_ts - now) * 1000);
       } else if (now < end_ts) {
         this.onSyncProgress();
