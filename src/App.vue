@@ -42,10 +42,14 @@
           <widgetbot id="discord-widget"
             :server="this.discordWidget.serverID"
             :channel="this.discordWidget.channelID"
-            height="100%"
+            height="49%"
             width="100%"
             shard="https://e.widgetbot.io"
           ></widgetbot>
+          <iframe
+            src="tg/index.html#/im?p=s1423166131_10869944524627764380"
+            style="height: 49%; width: 100%; border-style: none; border-radius: 7px;"
+          ></iframe>
       </el-col>
       <el-col :span="1"></el-col>
     </el-row>
